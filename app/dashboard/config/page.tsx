@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
-import { Globe, Loader2, Check, AlertCircle } from 'lucide-react';
+import { Globe, Loader2, Check, AlertCircle, Search } from 'lucide-react';
 
 const FALLBACK_ZONES = [
     'UTC',
@@ -25,6 +25,10 @@ export default function ConfigPage() {
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
 
+    // Estado del buscador de zona horaria
+    const [query, setQuery] = useState('');
+    const [open, setOpen] = useState(false);
+
     const zonas = useMemo<string[]>(() => {
         const fn = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
         try {
@@ -37,6 +41,18 @@ export default function ConfigPage() {
         }
         return FALLBACK_ZONES;
     }, []);
+
+    const filteredZonas = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return zonas;
+        return zonas.filter((z) => z.toLowerCase().includes(q));
+    }, [zonas, query]);
+
+    const selectZone = (z: string) => {
+        setZonaHoraria(z);
+        setQuery('');
+        setOpen(false);
+    };
 
     const loadConfig = async () => {
         try {
@@ -110,17 +126,45 @@ export default function ConfigPage() {
                                 Cargando...
                             </div>
                         ) : (
-                            <select
-                                value={zonaHoraria}
-                                onChange={(e) => setZonaHoraria(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-                            >
-                                {zonas.map((z) => (
-                                    <option key={z} value={z}>
-                                        {z}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={open ? query : zonaHoraria}
+                                    placeholder="Buscar zona horaria..."
+                                    onFocus={() => { setQuery(''); setOpen(true); }}
+                                    onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                                    onBlur={() => setOpen(false)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && filteredZonas.length > 0) {
+                                            e.preventDefault();
+                                            selectZone(filteredZonas[0]);
+                                        } else if (e.key === 'Escape') {
+                                            setOpen(false);
+                                        }
+                                    }}
+                                    className="w-full bg-slate-950 border border-slate-800 text-white pl-9 pr-3 py-2 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                                />
+                                {open && (
+                                    <ul className="absolute z-20 mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                        {filteredZonas.length === 0 ? (
+                                            <li className="px-3 py-2 text-sm text-slate-500">Sin resultados</li>
+                                        ) : (
+                                            filteredZonas.map((z) => (
+                                                <li key={z}>
+                                                    <button
+                                                        type="button"
+                                                        onMouseDown={(e) => { e.preventDefault(); selectZone(z); }}
+                                                        className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-blue-600/20 hover:text-white"
+                                                    >
+                                                        {z}
+                                                    </button>
+                                                </li>
+                                            ))
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
                         )}
                     </div>
 
