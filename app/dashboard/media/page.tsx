@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { mediaApi, AudioItem } from "@/lib/media";
 import { api } from "@/lib/api";
-import { Music, Upload, Trash2, Volume2, AlertCircle, Loader2, Play } from "lucide-react";
+import { Music, Upload, Trash2, Volume2, AlertCircle, Loader2, Play, Pencil, Check, X } from "lucide-react";
 
 function AudioPlayer({ fileKey }: { fileKey: string }) {
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -70,6 +70,14 @@ export default function MediaPage() {
     const [loading, setLoading] = useState(true);
     const [errorMsg, setErrorMsg] = useState("");
 
+    // Nombre opcional asignado al subir un archivo (por defecto, el nombre del archivo)
+    const [nombreNuevo, setNombreNuevo] = useState("");
+
+    // Estado para la edición inline del nombre de un audio
+    const [editingKey, setEditingKey] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState("");
+    const [savingKey, setSavingKey] = useState<string | null>(null);
+
     // Estado para controlar el estilo visual cuando el usuario arrastra un archivo
     const [isDragging, setIsDragging] = useState(false);
 
@@ -118,7 +126,8 @@ export default function MediaPage() {
 
         try {
             setUploading(true);
-            await mediaApi.uploadAudio(file);
+            await mediaApi.uploadAudio(file, nombreNuevo);
+            setNombreNuevo(""); // Limpiar el nombre tras subir
             await loadAudios(); // Recargar y reordenar la lista
         } catch (error: any) {
             console.error("Error al subir archivo:", error);
@@ -174,6 +183,43 @@ export default function MediaPage() {
         } catch (error) {
             console.error("Error al eliminar audio:", error);
             alert("Error al eliminar el archivo de audio");
+        }
+    };
+
+    // Renombrar audio
+    const startRename = (audio: AudioItem) => {
+        const fileKey = audio.nombreArchivo || audio.nombre;
+        setEditingKey(fileKey);
+        setEditingName(audio.nombre || audio.nombreArchivo || "");
+    };
+
+    const cancelRename = () => {
+        setEditingKey(null);
+        setEditingName("");
+    };
+
+    const saveRename = async (audio: AudioItem) => {
+        const fileKey = audio.nombreArchivo || audio.nombre;
+        const newName = editingName.trim();
+        if (!fileKey || !newName) return;
+
+        try {
+            setSavingKey(fileKey);
+            const updated = await mediaApi.renameAudio(fileKey, newName);
+            setAudios((prev) =>
+                prev.map((item) =>
+                    (item.nombreArchivo || item.nombre) === fileKey
+                        ? { ...item, nombre: updated.nombre }
+                        : item
+                )
+            );
+            setEditingKey(null);
+            setEditingName("");
+        } catch (error: any) {
+            console.error("Error al renombrar audio:", error);
+            alert(error.response?.data?.message || "Error al renombrar el audio");
+        } finally {
+            setSavingKey(null);
         }
     };
 
@@ -238,6 +284,21 @@ export default function MediaPage() {
                         </div>
                     )}
                 </div>
+
+                <div className="mt-4">
+                    <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
+                        Nombre del audio (opcional)
+                    </label>
+                    <input
+                        type="text"
+                        placeholder="Dejar en blanco para usar el nombre del archivo"
+                        value={nombreNuevo}
+                        onChange={(e) => setNombreNuevo(e.target.value)}
+                        disabled={uploading}
+                        className="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                    />
+                </div>
+
                 <p className="text-xs text-slate-500 mt-2">Tamaño máximo: 10MB.</p>
             </div>
 
@@ -262,6 +323,7 @@ export default function MediaPage() {
                         {audios.map((audio, index) => {
                             const fileName = audio.nombreArchivo || audio.nombre || `audio-${index}`;
                             const displayName = audio.nombre || audio.nombreArchivo || `Audio ${index + 1}`;
+                            const isEditing = editingKey === fileName;
 
                             return (
                                 <div
@@ -269,24 +331,70 @@ export default function MediaPage() {
                                     className="bg-slate-800/40 border border-slate-800 hover:border-slate-700 rounded-xl p-4 flex flex-col justify-between transition-colors shadow-md space-y-3"
                                 >
                                     <div>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Music className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                                            <p className="font-semibold text-sm text-white truncate" title={displayName}>
-                                                {displayName}
-                                            </p>
-                                        </div>
+                                        {isEditing ? (
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Music className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                                                <input
+                                                    type="text"
+                                                    value={editingName}
+                                                    onChange={(e) => setEditingName(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") saveRename(audio);
+                                                        if (e.key === "Escape") cancelRename();
+                                                    }}
+                                                    autoFocus
+                                                    className="flex-1 min-w-0 bg-slate-950 border border-slate-700 text-white px-2 py-1 rounded-md text-sm focus:outline-none focus:border-blue-500"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Music className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                                                <p className="font-semibold text-sm text-white truncate" title={displayName}>
+                                                    {displayName}
+                                                </p>
+                                            </div>
+                                        )}
 
                                         <AudioPlayer fileKey={audio.nombreArchivo ?? ""} />
                                     </div>
 
-                                    <div className="flex justify-end pt-2 border-t border-slate-800/80">
-                                        <button
-                                            onClick={() => handleDelete(fileName)}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-lg transition-colors"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                            Eliminar
-                                        </button>
+                                    <div className="flex justify-end gap-1.5 pt-2 border-t border-slate-800/80">
+                                        {isEditing ? (
+                                            <>
+                                                <button
+                                                    onClick={() => saveRename(audio)}
+                                                    disabled={savingKey === fileName || !editingName.trim()}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 rounded-lg transition-colors disabled:opacity-50"
+                                                >
+                                                    <Check className="w-3.5 h-3.5" />
+                                                    {savingKey === fileName ? "Guardando..." : "Guardar"}
+                                                </button>
+                                                <button
+                                                    onClick={cancelRename}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-700/50 border border-slate-700 rounded-lg transition-colors"
+                                                >
+                                                    <X className="w-3.5 h-3.5" />
+                                                    Cancelar
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    onClick={() => startRename(audio)}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 border border-blue-500/20 rounded-lg transition-colors"
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                    Renombrar
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(fileName)}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                    Eliminar
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             );

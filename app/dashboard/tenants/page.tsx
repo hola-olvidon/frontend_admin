@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { Recurrence, RecurrenceTipo, DIAS_SEMANA, formatRecurrence, nextExecutionMs } from '@/lib/recurrence';
 import {
@@ -452,6 +452,24 @@ export default function TenantsPage() {
         t.nombre.toLowerCase().includes(search.toLowerCase())
     );
 
+    // Mapa urlAudio -> nombre visible, para mostrar el nombre de la canción en las alarmas.
+    const audioNameByUrl = useMemo(() => {
+        const map: Record<string, string> = {};
+        audios.forEach((a) => {
+            if (a.urlAudio) {
+                map[a.urlAudio] = a.nombre || a.nombreArchivo || a.urlAudio;
+            }
+        });
+        return map;
+    }, [audios]);
+
+    const audioLabel = (url?: string | null): string => {
+        if (!url) return 'Sin audio';
+        const resolved = audioNameByUrl[url];
+        if (resolved) return resolved;
+        return url.split('/').pop() || url;
+    };
+
     const nextLabel = (alarm: Alarm): string => {
         try {
             const ms = nextExecutionMs(alarm, Date.now(), zonaHoraria);
@@ -621,9 +639,9 @@ export default function TenantsPage() {
                                                                 ? new Date(alarm.horaProgramada).toLocaleString()
                                                                 : '—'}
                                                                                     </span>
-                                                                                    <span className="truncate max-w-full sm:max-w-[200px] text-slate-500 flex items-center gap-1">
+                                                                                    <span className="truncate max-w-full sm:max-w-[200px] text-slate-500 flex items-center gap-1" title={audioLabel(alarm.urlAudio)}>
                                                                                         <Music className="w-3 h-3 text-slate-500" />
-                                                                                        {alarm.urlAudio}
+                                                                                        {audioLabel(alarm.urlAudio)}
                                                                                     </span>
                                                                                 </div>
                                                                                 <p className="text-xs text-blue-400 font-medium">
