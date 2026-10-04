@@ -117,8 +117,8 @@ export default function MediaPage() {
             return;
         }
 
-        // Validación: Tamaño máximo (10 MB)
-        const MAX_SIZE_MB = 10;
+        // Validación: Tamaño máximo (50 MB)
+        const MAX_SIZE_MB = 50;
         if (file.size > MAX_SIZE_MB * 1024 * 1024) {
             setErrorMsg(`El archivo supera el tamaño máximo permitido de ${MAX_SIZE_MB}MB.`);
             return;
@@ -299,7 +299,7 @@ export default function MediaPage() {
                     />
                 </div>
 
-                <p className="text-xs text-slate-500 mt-2">Tamaño máximo: 10MB.</p>
+                <p className="text-xs text-slate-500 mt-2">Tamaño máximo: 50MB.</p>
             </div>
 
             {/* Lista de Audios */}
